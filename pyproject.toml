@@ -1,0 +1,138 @@
+[tool.poetry]
+name = "pyclashbot"
+version = "v0.0.0"
+description = "Automated Clash Royale"
+readme = "../README.md"
+authors = [
+  "Matthew Miglio <matthew@pyclashbot.app>",
+  "Martin Miglio <code@martinmiglio.dev>",
+]
+homepage = "https://pyclashbot.app"
+include = [
+  "../README.md",
+  "pyclashbot/detection/reference_images/**/*.png",
+  "pyclashbot/__version__",
+  "pyclashbot/__pb__",
+]
+
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.13"
+opencv-python = "^4.9.0"
+numpy = "^1.26.2"
+pysimplegui = "^4.60.5"
+pymemuc = "^0.5.3"
+psutil = "^5.9.6"
+requests = "^2.31.0"
+pygetwindow = "^0.0.9"
+adbnativeblitz = "^0.11"
+pyautogui = "^0.9.54"
+
+
+[tool.poetry.group.build]
+optional = true
+
+
+[tool.poetry.group.build.dependencies]
+cx-freeze = "^6.15.12"
+poethepoet = "^0.24.4"
+
+
+[tool.poetry.group.dev]
+optional = true
+
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^3.6.0"
+black = "^23.11.0"
+vulture = "^2.10"
+isort = "^5.13.0"
+prospector = "^1.10.3"
+poethepoet = "^0.24.4"
+notebook = "^7.0.6"
+ipykernel = "^6.28.0"
+matplotlib = "^3.8.2"
+decorator = "^5.1.1"
+
+
+[tool.poe.tasks.build-dist]
+shell = """
+$Env:version | Out-File -FilePath "pyclashbot/__version__" -Encoding utf8
+$Env:pb_api_key | Out-File -FilePath "pyclashbot/__pb__" -Encoding utf8
+poetry run python setup_msi.py bdist_msi --target-version $Env:version
+"""
+interpreter = "powershell"
+
+
+[[tool.poe.tasks.build-dist.args]]
+name = "version"
+default = "dev"
+options = ["-v", "--version"]
+
+
+[tool.poe.tasks.tag]
+shell = """
+git push origin master
+git tag -a $Env:tagname -m "Release $Env:tagname"
+git push origin $Env:tagname
+"""
+interpreter = "powershell"
+
+
+[[tool.poe.tasks.tag.args]]
+name = "tagname"
+default = "dev"
+positional = true
+required = true
+
+
+[tool.poe.tasks.vulture]
+shell = """
+poetry run vulture pyclashbot --min-confidence 60
+"""
+interpreter = "powershell"
+
+[tool.poe.tasks.lint]
+shell = """
+poetry run prospector pyclashbot
+"""
+interpreter = "powershell"
+
+
+[tool.black]
+line-length = 88
+target-version = ['py310']
+include = '\.pyi?$'
+exclude = '''
+(
+  /(
+      \.eggs         # exclude a few common directories in the
+    | \.git          # root of the project
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | _build
+    | buck-out
+    | build
+    | dist
+  )/
+)
+'''
+
+
+[tool.isort]
+profile = "black"
+
+
+[tool.pylint.main]
+ignore = ["build", "debug"]
+py-version = "3.10"
+suggestion-mode = true
+disable = [
+  "C0114", # missing-module-docstring
+  "C0115", # missing-class-docstring
+  "C0116", # missing-function-docstring
+  "C0301", # line-too-long
+  "C0103", # invalid-name
+]
