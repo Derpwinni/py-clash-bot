@@ -1,0 +1,63 @@
+name: Build windows package
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build package
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@master
+      - name: Install Poetry
+        run: |
+          pipx install "poetry>=1.7.0"
+          pipx install poethepoet
+      - name: Set up Python 3.11
+        id: pysetup
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          cache: "poetry"
+      - name: Install package and dependencies
+        run: |
+          cd src
+          poetry env use '${{ steps.pysetup.outputs.python-path }}'
+          poetry install --with build --without dev
+      - name: Build package
+        run: |
+          cd src
+          poe build-dist -v ${{github.ref_name}}
+        env:
+          pb_api_key: ${{ secrets.pb_api_key }}
+      - name: Publish Release
+        uses: softprops/action-gh-release@master
+        id: release
+        with:
+          prerelease: ${{startsWith(github.ref, 'refs/tags/') && contains(github.ref, 'rc')}}
+          generate_release_notes: true
+          files: |
+            ./src/dist/py-clash-bot*.msi
+      - name: Trigger Discord Webhook
+        run: |
+          if ($${{startsWith(github.ref, 'refs/tags/') && contains(github.ref, 'rc')}}) {
+            $json = @{
+                title = "New Pre-release! ${{github.ref_name}}"
+                description = "Click to view changes and download"
+                url = "${{ steps.release.outputs.url }}"
+            } | ConvertTo-Json
+            Invoke-RestMethod -Method Post -Uri "https://www.pyclashbot.app/api/webhook/release/prerelease?code=${{ secrets.DISCORD_WEBHOOK_CODE }}" -ContentType 'application/json' -Body $json
+          } else {
+            $json = @{
+                title = "New Release! ${{github.ref_name}}"
+                description = "Click to view changes and download"
+                url = "${{ steps.release.outputs.url }}"
+            } | ConvertTo-Json
+            Invoke-RestMethod -Method Post -Uri "https://www.pyclashbot.app/api/webhook/release?code=${{ secrets.DISCORD_WEBHOOK_CODE }}" -ContentType 'application/json' -Body $json
+          }
+        shell: powershell
